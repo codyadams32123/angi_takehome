@@ -77,43 +77,44 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-  // Create Redis first. Makes it less likely errors experienced in podInfo deployment
-  if instance.Spec.Redis.Enabled {
-    redisDeploymentFound := &appsv1.Deployment{}
-    err = r.Client.Get(ctx, types.NamespacedName{Name: "redis" + instance.Name, Namespace: instance.Namespace}, redisDeploymentFound)
-    
-    if err != nil && errors.IsNotFound(err) {
-      //Creating Deployment as it doesn't existt
-      log.Info("Creating Redis Deployment")
-      redisDeployment := createRedisDeployment(instance)
-      ctrl.SetControllerReference(instance, redisDeployment, r.Scheme)
-      err := r.Client.Create(ctx, redisDeployment)
-      if err != nil {
-        log.Error(err, "Failed to create Redis Deployment")
-        return ctrl.Result{}, err
-      }
-      log.Info("Created Redis Deployment")
-    
-      redisServiceFound := &corev1.Service{}
-      err = r.Client.Get(ctx, types.NamespacedName{Name: "redis" + instance.Name, Namespace: instance.Namespace}, redisServiceFound)
+	// Create Redis first. Makes it less likely errors experienced in podInfo deployment
+	if instance.Spec.Redis.Enabled {
+		redisDeploymentFound := &appsv1.Deployment{}
+		err = r.Client.Get(ctx, types.NamespacedName{Name: "redis-" + instance.Name, Namespace: instance.Namespace}, redisDeploymentFound)
 
-      if err != nil && errors.IsNotFound(err) {
-        //Creating service as it doesn't exist
-        redisService := createRedisService(instance)
-        ctrl.SetControllerReference(instance, redisService, r.Scheme)
-        err := r.Client.Create(ctx, redisService)
-        if err != nil {
-          log.Error(err, "Failed to create Redis Service")
-          return ctrl.Result{}, err
-        }
-      }
-      log.Info("Created Redis Service")
-  }
-}
+		if err != nil && errors.IsNotFound(err) {
+			//Creating Deployment as it doesn't existt
+			log.Info("Creating Redis Deployment")
+			redisDeployment := createRedisDeployment(instance)
+			ctrl.SetControllerReference(instance, redisDeployment, r.Scheme)
+			err := r.Client.Create(ctx, redisDeployment)
+			if err != nil {
+				log.Error(err, "Failed to create Redis Deployment")
+				return ctrl.Result{}, err
+			}
+			log.Info("Created Redis Deployment")
+		}
+
+		redisServiceFound := &corev1.Service{}
+		err = r.Client.Get(ctx, types.NamespacedName{Name: "redis-" + instance.Name, Namespace: instance.Namespace}, redisServiceFound)
+
+		if err != nil && errors.IsNotFound(err) {
+			//Creating service as it doesn't exist
+			redisService := createRedisService(instance)
+			ctrl.SetControllerReference(instance, redisService, r.Scheme)
+			err := r.Client.Create(ctx, redisService)
+			if err != nil {
+				log.Error(err, "Failed to create Redis Service")
+				return ctrl.Result{}, err
+			}
+		}
+		log.Info("Created Redis Service")
+
+	}
 
 	// Check for PodInfo deployment
 	podInfoFound := &appsv1.Deployment{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: "podinfo" + instance.Name, Namespace: instance.Namespace}, podInfoFound)
+	err = r.Client.Get(ctx, types.NamespacedName{Name: "podinfo-" + instance.Name, Namespace: instance.Namespace}, podInfoFound)
 
 	if err != nil && errors.IsNotFound(err) {
 		//Creating if it doesn't exist
@@ -170,10 +171,10 @@ func createPodInfoDeployment(podInfo *groupv1alpha1.MyAppResource) *appsv1.Deplo
 
 	podInfoDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "podinfo" + podInfo.Name,
+			Name: "podinfo-" + podInfo.Name,
 			Labels: map[string]string{
 				"app":  "podinfo",
-				"name": "podinfo" + podInfo.Name,
+				"name": "podinfo-" + podInfo.Name,
 			},
 			Namespace: podInfo.Namespace,
 		},
@@ -181,7 +182,7 @@ func createPodInfoDeployment(podInfo *groupv1alpha1.MyAppResource) *appsv1.Deplo
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app":  "podinfo",
-					"name": "podinfo" + podInfo.Name,
+					"name": "podinfo-" + podInfo.Name,
 				},
 			},
 			Replicas: &podInfo.Spec.ReplicaCount,
@@ -189,21 +190,21 @@ func createPodInfoDeployment(podInfo *groupv1alpha1.MyAppResource) *appsv1.Deplo
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app":  "podinfo",
-						"name": "podinfo" + podInfo.Name,
+						"name": "podinfo-" + podInfo.Name,
 					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "podinfo" + podInfo.Name,
+							Name:  "podinfo-" + podInfo.Name,
 							Image: podInfo.Spec.Image.Repository + ":" + podInfo.Spec.Image.Tag,
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
-									corev1.ResourceCPU: cpuRequest,
+									corev1.ResourceCPU:    cpuRequest,
 									corev1.ResourceMemory: memRequest,
 								},
 								Limits: corev1.ResourceList{
-									corev1.ResourceLimitsCPU:    cpuLimit,
+									corev1.ResourceCPU:    cpuLimit,
 									corev1.ResourceMemory: memLimit,
 								},
 							},
@@ -223,51 +224,87 @@ func createPodInfoDeployment(podInfo *groupv1alpha1.MyAppResource) *appsv1.Deplo
 			}},
 	}
 
-  if podInfo.Spec.Redis.Enabled {
-    podInfoDeployment.Spec.Template.Spec.Containers[0].Env = append(podInfoDeployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
-        Name:  "PODINFO_CACHE_SERVER",
-        Value: "tcp://redis" + podInfo.Name + ":6379",
-      })
-  }
+	if podInfo.Spec.Redis.Enabled {
+		podInfoDeployment.Spec.Template.Spec.Containers[0].Env = append(podInfoDeployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			Name:  "PODINFO_CACHE_SERVER",
+			Value: "tcp://redis-" + podInfo.Name + ":6379",
+		})
+	}
 	return podInfoDeployment
 }
 
-func createRedis(redis *groupv1alpha1.MyAppResource) error {
+func createRedisDeployment(myapp *groupv1alpha1.MyAppResource) *appsv1.Deployment {
 
-	// foundDeployment := &appsv1.Deployment{}
-	// err := r.Client.Get(ctx, types.NamespacedName{Name: "redis" + redis.Name}, foundDeployment)
-	// deployment := &appsv1.Deployment{
-	// 	ObjectMeta: metav1.ObjectMeta{
-	// 		Name: "redis" + redis.Name,
-	// 		Labels: map[string]string{
-	// 			"app": "redis",
-	// 			"name": "redis",
-	// 		}},
-	// 	Spec: appsv1.DeploymentSpec{
-	// 		Selector: &metav1.LabelSelector{
-	// 			MatchLabels: map[string]string{
-	// 				"app": "redis",
-	// 				"name": "redis",
-	// 			},
-	// 		},
-	// 	},
-	// }
+	var replica int32 = 1
+	redisDeployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "redis-" + myapp.Name,
+			Labels: map[string]string{
+				"app":  "redis",
+				"name": "redis-" + myapp.Name,
+			},
+			Namespace: myapp.Namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app":  "redis",
+					"name": "redis-" + myapp.Name,
+				},
+			},
+			Replicas: &replica,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":  "redis",
+						"name": "redis-" + myapp.Name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "redis-" + myapp.Name,
+							Image: "redis:latest",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "redis",
+									ContainerPort: 6379,
+									Protocol:      corev1.ProtocolTCP,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 
-	// service := &corev1.Service{
-	// 	ObjectMeta: metav1.ObjectMeta{
-	// 		Name: "redis" + redis.Name,
-	// 		Labels: map[string]string{
-	// 			"app": "redis",
-	// 			"name": "redis",
-	// 		}},
-	// 	Spec: corev1.ServiceSpec{
-	// 		Selector: map[string]string{
-	// 			"app": "redis",
-	// 			"name": "redis",
-	// 		},
-	// 		Ports: []corev1.ServicePort{
+	return redisDeployment
+}
 
-	// }
-
-	return nil
+func createRedisService(myapp *groupv1alpha1.MyAppResource) *corev1.Service {
+	redisService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "redis-" + myapp.Name,
+			Labels: map[string]string{
+				"app":  "redis",
+				"name": "redis-" + myapp.Name,
+			},
+			Namespace: myapp.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{
+				"app":  "redis",
+				"name": "redis-" + myapp.Name,
+			},
+			Ports: []corev1.ServicePort{
+				{
+					Name:     "redis",
+					Port:     6379,
+					Protocol: corev1.ProtocolTCP,
+				},
+			},
+		},
+	}
+	return redisService
 }
