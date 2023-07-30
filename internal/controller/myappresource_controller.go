@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -68,7 +69,9 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	podInfoFound := &appsv1.Deployment{}
 
 	err = r.Client.Get(ctx, types.NamespacedName{Name: "podinfo" + instance.Name, Namespace: instance.Namespace}, podInfoFound)
-
+	if err != nil && errors.IsNotFound(err) {
+		log.Info("Creating PodInfo Deployment")
+	}
 	return ctrl.Result{}, nil
 }
 
@@ -114,7 +117,7 @@ func createRedis(redis *groupv1alpha1.MyAppResource) error {
 	// 			"name": "redis",
 	// 		},
 	// 		Ports: []corev1.ServicePort{
-				
+
 	// }
 
 	return nil

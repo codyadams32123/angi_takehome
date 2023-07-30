@@ -23,24 +23,24 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-//Resources Struct
+// Resources Struct
 type Resources struct {
-	memoryLimit string `json:"memoryLimit"`
-	cpuRequest  string `json:"cpuRequest"`
+	MemoryLimit string `json:"memoryLimit"`
+	CpuRequest  string `json:"cpuRequest"`
 }
 
 type Image struct {
-	repository string `json:"repository"`
-	tag        string `json:"tag"`
+	Repository string `json:"repository"`
+	Tag        string `json:"tag"`
 }
 
 type UI struct {
-	color string `json:"color"`
-	message string `json:"message"`
+	Color   string `json:"color"`
+	Message string `json:"message"`
 }
 
 type Redis struct {
-	enabled bool `json:"enabled"`
+	Enabled bool `json:"enabled"`
 }
 
 // MyAppResourceSpec defines the desired state of MyAppResource
@@ -49,23 +49,23 @@ type MyAppResourceSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// 	spec:
-		// replicaCount: 2
-		// resources:
-			// memoryLimit: 64Mi
-			// cpuRequest: 100m
-		// image:
-			// repository: ghcr.io/stefanprodan/podinfo
-			// tag: latest
-		// ui:
-			// color: "#34577c"
-			// message: "some string"
-		// redis:
-			// enabled: true
-	replicaCount int32 `json:"replicaCount"`
-	resources    Resources `json:"resources"`
-	image Image `json:"image"`
-	ui UI `json:"ui"`
-	redis Redis `json:"redis"`
+	// replicaCount: 2
+	// resources:
+	// memoryLimit: 64Mi
+	// cpuRequest: 100m
+	// image:
+	// repository: ghcr.io/stefanprodan/podinfo
+	// tag: latest
+	// ui:
+	// color: "#34577c"
+	// message: "some string"
+	// redis:
+	// enabled: true
+	ReplicaCount int32     `json:"replicaCount"`
+	Resources    Resources `json:"resources"`
+	Image        Image     `json:"image"`
+	Ui           UI        `json:"ui"`
+	Redis        Redis     `json:"redis"`
 }
 
 // MyAppResourceStatus defines the observed state of MyAppResource
