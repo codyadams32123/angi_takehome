@@ -19,7 +19,10 @@ package controller
 import (
 	"context"
 
+	"strconv"
+
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,6 +31,8 @@ import (
 
 	groupv1alpha1 "github.com/codyadams32123/angi_takehome/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // MyAppResourceReconciler reconciles a MyAppResource object
@@ -39,6 +44,13 @@ type MyAppResourceReconciler struct {
 //+kubebuilder:rbac:groups=group.angi.com,resources=myappresources,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=group.angi.com,resources=myappresources/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=group.angi.com,resources=myappresources/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=pods/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=services/status,verbs=get;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -65,13 +77,62 @@ func (r *MyAppResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+  // Create Redis first. Makes it less likely errors experienced in podInfo deployment
+  if instance.Spec.Redis.Enabled {
+    redisDeploymentFound := &appsv1.Deployment{}
+    err = r.Client.Get(ctx, types.NamespacedName{Name: "redis" + instance.Name, Namespace: instance.Namespace}, redisDeploymentFound)
+    
+    if err != nil && errors.IsNotFound(err) {
+      //Creating Deployment as it doesn't existt
+      log.Info("Creating Redis Deployment")
+      redisDeployment := createRedisDeployment(instance)
+      ctrl.SetControllerReference(instance, redisDeployment, r.Scheme)
+      err := r.Client.Create(ctx, redisDeployment)
+      if err != nil {
+        log.Error(err, "Failed to create Redis Deployment")
+        return ctrl.Result{}, err
+      }
+      log.Info("Created Redis Deployment")
+    
+      redisServiceFound := &corev1.Service{}
+      err = r.Client.Get(ctx, types.NamespacedName{Name: "redis" + instance.Name, Namespace: instance.Namespace}, redisServiceFound)
+
+      if err != nil && errors.IsNotFound(err) {
+        //Creating service as it doesn't exist
+        redisService := createRedisService(instance)
+        ctrl.SetControllerReference(instance, redisService, r.Scheme)
+        err := r.Client.Create(ctx, redisService)
+        if err != nil {
+          log.Error(err, "Failed to create Redis Service")
+          return ctrl.Result{}, err
+        }
+      }
+      log.Info("Created Redis Service")
+  }
+}
+
 	// Check for PodInfo deployment
 	podInfoFound := &appsv1.Deployment{}
-
 	err = r.Client.Get(ctx, types.NamespacedName{Name: "podinfo" + instance.Name, Namespace: instance.Namespace}, podInfoFound)
+
 	if err != nil && errors.IsNotFound(err) {
+		//Creating if it doesn't exist
 		log.Info("Creating PodInfo Deployment")
+		podInfoDeployment := createPodInfoDeployment(instance)
+		ctrl.SetControllerReference(instance, podInfoDeployment, r.Scheme)
+		err := r.Client.Create(ctx, podInfoDeployment)
+		if err != nil {
+			log.Error(err, "Failed to create PodInfo Deployment")
+			return ctrl.Result{}, err
+		}
+		// err = r.Status().Update(ctx, instance, &client.UpdateOptions{})
+		log.Info("Created PodInfo Deployment")
+	} else if err != nil {
+		//Requeue if failed to read object for another reason
+		log.Error(err, "Failed to get PodInfo Deployment")
+		return ctrl.Result{}, err
 	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -81,6 +142,94 @@ func (r *MyAppResourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&groupv1alpha1.MyAppResource{}).
 		Owns(&appsv1.Deployment{}).
 		Complete(r)
+}
+
+/*
+Generate PodInfo Deployment and apply to cluster
+*/
+func createPodInfoDeployment(podInfo *groupv1alpha1.MyAppResource) *appsv1.Deployment {
+
+	cpuRequest, err := resource.ParseQuantity(podInfo.Spec.Resources.CpuRequest)
+	if err != nil {
+		return nil
+	}
+
+	memLimit, err := resource.ParseQuantity(podInfo.Spec.Resources.MemoryLimit)
+	if err != nil {
+		return nil
+	}
+
+	cpuLimit := cpuRequest.DeepCopy()
+	memRequest := memLimit.DeepCopy()
+
+	cpuLimit.Set(cpuLimit.Value() * 2)
+	memRequest.Set(memRequest.Value() / 2)
+
+	println("Cpu Limit value is: " + strconv.FormatInt(cpuLimit.Value(), 10))
+	println("Memory Request: " + strconv.FormatInt(memRequest.Value(), 10))
+
+	podInfoDeployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "podinfo" + podInfo.Name,
+			Labels: map[string]string{
+				"app":  "podinfo",
+				"name": "podinfo" + podInfo.Name,
+			},
+			Namespace: podInfo.Namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app":  "podinfo",
+					"name": "podinfo" + podInfo.Name,
+				},
+			},
+			Replicas: &podInfo.Spec.ReplicaCount,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":  "podinfo",
+						"name": "podinfo" + podInfo.Name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "podinfo" + podInfo.Name,
+							Image: podInfo.Spec.Image.Repository + ":" + podInfo.Spec.Image.Tag,
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU: cpuRequest,
+									corev1.ResourceMemory: memRequest,
+								},
+								Limits: corev1.ResourceList{
+									corev1.ResourceLimitsCPU:    cpuLimit,
+									corev1.ResourceMemory: memLimit,
+								},
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "PODINFO_UI_COLOR",
+									Value: podInfo.Spec.Ui.Color,
+								},
+								{
+									Name:  "PODINFO_UI_MESSAGE",
+									Value: podInfo.Spec.Ui.Message,
+								},
+							},
+						},
+					},
+				},
+			}},
+	}
+
+  if podInfo.Spec.Redis.Enabled {
+    podInfoDeployment.Spec.Template.Spec.Containers[0].Env = append(podInfoDeployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+        Name:  "PODINFO_CACHE_SERVER",
+        Value: "tcp://redis" + podInfo.Name + ":6379",
+      })
+  }
+	return podInfoDeployment
 }
 
 func createRedis(redis *groupv1alpha1.MyAppResource) error {

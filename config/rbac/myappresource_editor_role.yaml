@@ -11,21 +11,21 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: myappresource-editor-role
 rules:
-- apiGroups:
-  - group.angi.com
-  resources:
-  - myappresources
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - group.angi.com
-  resources:
-  - myappresources/status
-  verbs:
-  - get
+  - apiGroups:
+      - group.angi.com
+    resources:
+      - myappresources
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - group.angi.com
+    resources:
+      - myappresources/status
+    verbs:
+      - get
