@@ -1,0 +1,69 @@
+{
+	"info": {
+		"_postman_id": "6f3b8aad-9bf2-47ef-9725-95cd523f55af",
+		"name": "Angi",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "28845296"
+	},
+	"item": [
+		{
+			"name": "localhost:8080/cache/key",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n                        \"type\": \"string\",\n                        \"description\": \"Test this endpoint\",\n                        \"name\": \"thingy\",\n                        \"in\": \"path\",\n                        \"required\": true\n                    }",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/cache/key",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"cache",
+						"key"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "localhost:8080/cache/key",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n                        \"name\": \"thingy\"\n                    }",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/cache/key",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"cache",
+						"key"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

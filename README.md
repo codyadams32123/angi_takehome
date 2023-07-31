@@ -1,82 +1,56 @@
 # angi
-// TODO(user): Add simple overview of use/purpose
+
+Quick implementation of controller requirements for interview process
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
 
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+Controller implementing the CRD provided in the PDF. It implements the creation and deletion of resources. Doesn't apply updates.
+Testing revolves around Postman in the test/ folder
 
-### Running on the cluster
-1. Install Instances of Custom Resources:
+### Running and Testing
 
-```sh
-kubectl apply -f config/samples/
-```
-
-2. Build and push your image to the location specified by `IMG`:
+1. Bring up Minikube
 
 ```sh
-make docker-build docker-push IMG=<some-registry>/angi:tag
+minikube start
 ```
 
-3. Deploy the controller to the cluster with the image specified by `IMG`:
+2. Make docker daemon the same as minikube
 
 ```sh
-make deploy IMG=<some-registry>/angi:tag
+eval $(minikube docker-env)
 ```
 
-### Uninstall CRDs
-To delete the CRDs from the cluster:
+3. In the top directory run the following commands. As long as the image is returned it should be available to minikube
 
 ```sh
-make uninstall
+make docker-build
+docker images | grep controller
 ```
 
-### Undeploy controller
-UnDeploy the controller from the cluster:
+4. Deploy CRD and Controller:
 
 ```sh
-make undeploy
+make deploy
 ```
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
-
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/),
-which provide a reconcile function responsible for synchronizing resources until the desired state is reached on the cluster.
-
-### Test It Out
-1. Install the CRDs into the cluster:
+5. Apply the custom resources:
 
 ```sh
-make install
+kubectl apply -f config/samples/group_v1alpha1_myappresource.yaml
 ```
 
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
+6. Port forward the deployment
 
 ```sh
-make run
+kubectl port-forward deployment/podinfo-myappresource-sample 8080:9898
 ```
 
-**NOTE:** You can also run this in one step by running: `make install run`
+7. Test it out
+   At this point you can open a browser and go to "localhost:8080" and view the webpage that should include the custom message and color chosen
+   Depending on if Redis is enabled you can also test the endpoint via Postman. You will want to import the Postman json from the tests/ folder.
 
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
-
-```sh
-make manifests
-```
-
-**NOTE:** Run `make --help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
+### License
 
 Copyright 2023.
 
@@ -91,4 +65,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
